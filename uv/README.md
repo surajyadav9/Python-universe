@@ -337,3 +337,40 @@ dependencies = [
 [package.metadata]
 requires-dist = [{ name = "httpx", specifier = ">=0.28.1" }]
 ```
+
+<br/>
+
+
+## Running commands - uv run
+Prior to every `uv run` invocation, uv will verify that the lockfile is up-to-date with the pyproject.toml, and that the environment is up-to-date with the lockfile, keeping your project in-sync without the need for manual intervention. 
+<br/>
+
+`uv run` guarantees that your command is run in an environment with all required dependencies at their locked versions.
+<br/>
+
+For example, to use flask:
+```SHELL
+uv add flask
+uv run -- flask run -p 3000
+```
+
+Alternatively, you can use `uv sync` to manually update the environment then activate it before executing a command:
+
+```SHELL
+uv sync
+source .venv/bin/activate
+flask run -p 3000
+```
+<br/>
+
+## Building distributions
+`uv build` can be used to build source distributions (sdist) and binary distributions (wheel) for your project.
+<br/>
+
+By default, `uv build` will build the project in the current directory, and place the built artifacts in a `dist/` subdirectory:
+```
+$ uv build
+$ ls dist/
+hello_world-0.1.0-py3-none-any.whl
+hello_world-0.1.0.tar.gz
+```
