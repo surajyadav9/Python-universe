@@ -62,7 +62,7 @@ Parallelism is a special case of concurrency. All parallel systems are concurren
 
 * Contention over the GIL slows down compute-intensive Python threads. Sequential, single-threaded code is simpler and faster for such tasks. If you want your application to make better use of the computational resources of multicore machines, you are advised to use `multiprocessing` or `concurrent.futures.ProcessPoolExecutor`. However, threading is still an appropriate model if you want to run multiple I/O-bound tasks simultaneously.
 
-## Why `threading` shines in I/O operations? 
+## 3. Why `threading` shines in I/O operations? 
 > Suppose I'm downloading 20 high resolution images from internet using requests module, each takes roughly 1 sec., if I do it sequentially it would take 20 seconds. 
 But if I use multithreading it finishes in 1 second? How? 
 Threads do not do multi-processing. The only thing that we did was triggering all 20 downloads almost simultaneously using thread pool executor. So, it does not have to wait for the others to finish. 
@@ -139,28 +139,11 @@ Files already in the OS cache: reading is just a memory copy, which is CPU work,
 
 Threads help when your program spends its time waiting on something that can serve many requests at once. They don’t help if the work is CPU-bound (that’s where multiprocessing comes in, since the GIL blocks threads from running Python code in parallel), or if the thing you’re waiting on is already maxed out (a saturated network link or a single HDD).
 
-## 1. Core Concurrency Concepts: Concurrency, I/O-Bound, and CPU-Bound Workloads
+<br/><br/>
 
-Concurrency in Python allows code to execute non-sequentially, providing a mechanism to speed up programs that spend substantial time waiting for external operations. Understanding when and why to use threads requires distinguishing between synchronous execution, concurrent execution, and the underlying nature of the workload.
+# Multi-threading in Python
 
-### Synchronous vs. Concurrent Execution
-
-In standard synchronous execution, Python executes statements line-by-line in sequential order. When a function initiates an operation that involves waiting—such as a network call or a sleep timer—the script halts all execution until that operation completes before moving to the subsequent line.
-
-In contrast, concurrent execution using Python's `threading` module alters this behavior. When a thread encounters an I/O wait state, Python switches context to begin or resume execution of another thread. Although standard Python threads do not execute code truly in parallel on multiple CPU cores at the exact same instant, concurrency creates the functional result of overlapped execution by eliminating idle waiting time.
-
-### I/O-Bound vs. CPU-Bound Workloads
-
-The decision to use threading depends entirely on whether a workload is I/O-bound or CPU-bound.
-
-| Workload Type | Characteristics & Examples | Threading Suitability |
-| :--- | :--- | :--- |
-| **I/O-Bound** | Operations spending most execution time waiting for input/output responses (e.g., HTTP requests, reading/writing disk files, network socket calls, sleep delays). | **High Benefit**: Drastically reduces overall execution time by overlapping wait states across threads. |
-| **CPU-Bound** | Operations requiring heavy mathematical computations and data crunching (e.g., image manipulation, matrix operations, machine learning processing). | **Low / Negative Benefit**: Can slow down execution due to the overhead of creating, context switching, and destroying threads. Requires multiprocessing for parallelism. |
-
----
-
-## 2. Low-Level Thread Management with the `threading` Module
+## 1. Low-Level Thread Management with the `threading` Module
 
 Python's built-in `threading` module provides explicit control over thread instantiation, execution, and synchronization.
 
@@ -198,7 +181,21 @@ finish = time.perf_counter()
 print(f'Finished in {round(finish - start, 2)} second(s)')
 ```
 
+Output - 
+
+```BASH
+surya@Surajs-Laptop Python-universe % python test.py 
+Sleeping 1.5 second(s)...
+Sleeping 1.5 second(s)...
+Done sleeping.
+Done sleeping.
+Finished in 1.51 second(s)
+```
+
+Note - 
+
 In this setup, `t1.start()` and `t2.start()` initiate both tasks almost simultaneously. The main program execution reaches `t1.join()` and `t2.join()`, waiting for both background operations to complete. Rather than taking 3.0 seconds sequentially, the combined execution completes in approximately 1.5 seconds.
+
 
 ### Scaling Manual Threads with Loops
 
@@ -226,11 +223,43 @@ finish = time.perf_counter()
 print(f'Finished in {round(finish - start, 2)} second(s)')
 ```
 
+Output - 
+
+```ZSH
+surya@Surajs-Laptop Python-universe % python test.py
+Sleeping 1.5 second(s)...
+Sleeping 1.5 second(s)...
+Sleeping 1.5 second(s)...
+Sleeping 1.5 second(s)...
+Sleeping 1.5 second(s)...
+Sleeping 1.5 second(s)...
+Sleeping 1.5 second(s)...
+Sleeping 1.5 second(s)...
+Sleeping 1.5 second(s)...
+Sleeping 1.5 second(s)...
+Done sleeping.
+Done sleeping.
+Done sleeping.
+Done sleeping.
+Done sleeping.
+Done sleeping.
+Done sleeping.
+Done sleeping.
+Done sleeping.
+Done sleeping.
+Finished in 1.51 second(s)
+```
+
 While synchronous execution of 10 calls with a 1.5-second delay would require 15.0 seconds, the concurrent loop implementation completes in approximately 1.5 seconds.
+
+### Note - 
+
+* By default, Python's `threading.Thread` class **does not directly return the value of the function it executes.**
+* The most common and effective ways to retrieve a return value from a thread include using a `ThreadPoolExecutor` (recommended) or using a thread-safe `queue.Queue`.
 
 ---
 
-## 3. Modern Concurrency with `concurrent.futures.ThreadPoolExecutor`
+## 2. Modern Concurrency with `concurrent.futures.ThreadPoolExecutor`
 
 Introduced in Python 3.2, the `concurrent.futures` module offers high-level abstractions for managing thread execution via thread pools. The `ThreadPoolExecutor` handles thread lifecycle management automatically and works seamlessly with context managers.
 
@@ -239,25 +268,45 @@ Introduced in Python 3.2, the `concurrent.futures` module offers high-level abst
 The `submit()` method schedules a callable for execution and immediately returns a `Future` object encapsulating the execution state. Calling `.result()` on a `Future` returns the target function's return value, blocking until execution finishes.
 
 ```python
-import time
 import concurrent.futures
+import time
+
 
 def do_something(seconds):
-    print(f'Sleeping {seconds} second(s)...')
+    print(f"Sleeping {seconds} second(s)...")
     time.sleep(seconds)
-    return f'Done sleeping...{seconds}'
+    return f"Done sleeping...{seconds}"
+
 
 with concurrent.futures.ThreadPoolExecutor() as executor:
     f1 = executor.submit(do_something, 1)
     f2 = executor.submit(do_something, 1)
 
+    print(f1, f2, flush=True)
+
     print(f1.result())
     print(f2.result())
+
+    print(f1, f2, flush=True)
 ```
+
+Output - 
+
+```ZSH
+surya@Surajs-Laptop Python-universe % python test.py
+Sleeping 1 second(s)...
+Sleeping 1 second(s)...
+<Future at 0x109fc8980 state=running> <Future at 0x109f72d50 state=running>
+Done sleeping...1
+Done sleeping...1
+<Future at 0x109fc8980 state=finished returned str> <Future at 0x109f72d50 state=finished returned str> 
+```
+
+<br/>
 
 ### Collecting Results in Order of Completion via `as_completed()`
 
-When running tasks with varying durations, `concurrent.futures.as_completed()` returns an iterator yielding futures as they finish, regardless of the order in which they were submitted.
+When running tasks with ***varying durations***, `concurrent.futures.as_completed()` returns an iterator yielding futures as they finish, ***regardless of the order in which they were submitted***.
 
 ```python
 import time
@@ -272,21 +321,81 @@ with concurrent.futures.ThreadPoolExecutor() as executor:
         print(f.result())
 ```
 
+Output - 
+
+```ZSH
+surya@Surajs-Laptop Python-universe % python test.py
+Sleeping 5 second(s)...
+Sleeping 4 second(s)...
+Sleeping 3 second(s)...
+Sleeping 2 second(s)...
+Sleeping 1 second(s)...
+Done sleeping...1
+Done sleeping...2
+Done sleeping...3
+Done sleeping...4
+Done sleeping...5
+```
+
 In this execution:
 1. All five threads start almost simultaneously.
 2. The 1-second thread completes first, yielding its result immediately.
 3. Subsequent threads yield results in ascending order of completion (1, 2, 3, 4, 5 seconds).
 4. Total execution runtime equals the longest single task (5.0 seconds), compared to 15.0 seconds synchronously.
 
+<br/>
+
 ### Bulk Mapping with `executor.map()`
 
-When applying a single function across an iterable of inputs, `executor.map()` provides a concise syntax. Unlike `as_completed()`, `executor.map()` returns results strictly in the order tasks were started.
+When applying a single function across an iterable of inputs, `executor.map()` provides a concise syntax. Unlike `as_completed()`, `executor.map()` ***returns results strictly in the order tasks were started.***
 
 ```python
 import time
 import concurrent.futures
 
 seconds_list = [5, 4, 3, 2, 1]
+
+start_time = time.perf_counter()
+
+with concurrent.futures.ThreadPoolExecutor() as executor:
+    results = executor.map(do_something, seconds_list)
+
+    for result in results:
+        print(result)
+
+end_time = time.perf_counter()
+print(f"Finished in {(end_time - start_time):.2f} second(s)")
+```
+
+Output - 
+
+```ZSH
+surya@Surajs-Laptop Python-universe % python test.py
+Sleeping 5 second(s)...
+Sleeping 4 second(s)...
+Sleeping 3 second(s)...
+Sleeping 2 second(s)...
+Sleeping 1 second(s)...
+Done sleeping...5
+Done sleeping...4
+Done sleeping...3
+Done sleeping...2
+Done sleeping...1
+Finished in 5.01 second(s)
+```
+
+Key characteristics of `executor.map()` and `context managers` include:
+- **Result Ordering**: Iterating over `results` yields items matching the input iterable's sequence. If the first item (5 seconds) takes longer than subsequent items, iteration blocks until the first item finishes, after which subsequent ready results yield instantly.
+- **Automatic Joining**: Exiting the `with` block automatically joins all worker threads, ensuring all background tasks conclude before execution proceeds past the context manager.
+- **Exception Handling**: If a thread raises an exception during execution, the exception is deferred until its specific value is retrieved from the results iterator.
+
+Eg.
+
+```PYTHON
+import concurrent.futures
+import time
+
+seconds_list = [5, 4, -3, 2, 1]
 
 with concurrent.futures.ThreadPoolExecutor() as executor:
     results = executor.map(do_something, seconds_list)
@@ -295,14 +404,27 @@ with concurrent.futures.ThreadPoolExecutor() as executor:
         print(result)
 ```
 
-Key characteristics of `executor.map()` and context managers include:
-- **Result Ordering**: Iterating over `results` yields items matching the input iterable's sequence. If the first item (5 seconds) takes longer than subsequent items, iteration blocks until the first item finishes, after which subsequent ready results yield instantly.
-- **Automatic Joining**: Exiting the `with` block automatically joins all worker threads, ensuring all background tasks conclude before execution proceeds past the context manager.
-- **Exception Handling**: If a thread raises an exception during execution, the exception is deferred until its specific value is retrieved from the results iterator.
+Output - 
+
+```
+surya@Surajs-Laptop Python-universe % python test.py
+Sleeping 5 second(s)...
+Sleeping 4 second(s)...
+Sleeping -3 second(s)...
+Sleeping 1 second(s)...
+Sleeping 2 second(s)...
+Done sleeping...5
+Done sleeping...4
+Traceback (most recent call last):
+  .
+  .
+  .
+ValueError: Seconds must be non-negative
+```
 
 ---
 
-## 4. Real-World Case Study: Asynchronous Web Image Downloader
+## 3. Real-World Case Study: Asynchronous Web Image Downloader
 
 To measure real-world performance gains, consider downloading high-resolution images over a network connection—a classic I/O-bound operation.
 
